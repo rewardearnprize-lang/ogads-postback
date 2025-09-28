@@ -1,0 +1,41 @@
+import admin from "firebase-admin";
+
+function getServiceAccount() {
+  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+}
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(getServiceAccount()),
+  });
+}
+
+export async function handler(event) {
+  try {
+    const params = new URLSearchParams(event.queryStringParameters);
+    const secret = process.env.POSTBACK_SECRET;
+
+    if (secret && params.get("secret") !== secret) {
+      return { statusCode: 403, body: "Forbidden" };
+    }
+
+    const email = params.get("subid");
+    if (!email) {
+      return { statusCode: 400, body: "Missing email/subid" };
+    }
+
+    const db = admin.firestore();
+    await db.collection("ogads_completed").doc(email).set({
+      email,
+      offerId: params.get("offer_id") || null,
+      payout: params.get("payout") || null,
+      receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { statusCode: 200, body: "ok" };
+  } catch (err) {
+    console.error(err);
+    return { statusCode: 500, body: "error" };
+  }
+}
