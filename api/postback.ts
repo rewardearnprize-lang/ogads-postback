@@ -1,49 +1,58 @@
-import { initializeApp, cert, getApps } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import admin from "firebase-admin";
 
-const serviceAccount = JSON.parse(
-  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64!, "base64").toString("utf8")
-);
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(
+    Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, "base64").toString("utf8")
+  );
 
-// ✅ تهيئة Firebase Admin مرة واحدة فقط
-if (!getApps().length) {
-  initializeApp({
-    credential: cert(serviceAccount),
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
   });
 }
 
-const db = getFirestore();
+const db = admin.firestore();
 
 export default async function handler(req, res) {
   try {
-    const { key, secret } = req.query;
+    // نسمح فقط بالطلبات GET أو POST من OGAds
+    if (req.method !== "GET" && req.method !== "POST") {
+      return res.status(405).json({ error: "Method not allowed" });
+    }
 
-    // ✅ تحقق من السر القادم من OGAds (أمان)
+    // استلام البيانات من postback
+    const { key, payout, secret } = req.query;
+
+    // تحقق من السر لحماية الرابط
     if (secret !== process.env.POSTBACK_SECRET) {
-      return res.status(403).json({ success: false, error: "Invalid secret" });
+      return res.status(403).json({ error: "Invalid secret" });
     }
 
     if (!key) {
-      return res.status(400).json({ success: false, error: "Missing key" });
+      return res.status(400).json({ error: "Missing key" });
     }
 
-    // ✅ تحديث verified إلى true
-    const participantRef = db.collection("participants").doc(key);
-    const docSnap = await participantRef.get();
+    // جلب المستند من Firestore
+    const docRef = db.collection("participants").doc(key);
+    const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return res.status(404).json({ success: false, error: "Key not found" });
+      return res.status(404).json({ error: "Key not found" });
     }
 
-    await participantRef.update({
+    // تحديث verified + payout
+    await docRef.update({
       verified: true,
+      payout: payout ? parseFloat(payout) : 0,
       verifiedAt: new Date().toISOString(),
     });
 
-    console.log(`✅ Updated participant ${key} -> verified: true`);
-    return res.json({ success: true, message: `Participant ${key} verified.` });
+    return res.status(200).json({
+      message: "✅ Participant verified successfully",
+      key,
+      payout: payout || 0,
+    });
   } catch (error) {
-    console.error("❌ Error updating participant:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    console.error("❌ Error verifying participant:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 }
