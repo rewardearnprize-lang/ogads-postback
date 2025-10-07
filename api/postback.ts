@@ -14,13 +14,21 @@ const db = admin.firestore();
 
 export default async function handler(req, res) {
   try {
-    // نسمح فقط بالطلبات GET أو POST من OGAds
+    // نسمح فقط بالطلبات GET أو POST من OGAds أو أي شبكة
     if (req.method !== "GET" && req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
-    // استلام البيانات من postback
-    const { key, payout, secret } = req.query;
+    // استقبال البيانات من postback
+    const { payout, secret } = req.query;
+
+    // دعم جميع أسماء المفاتيح المحتملة من OGAds أو LockedApp
+    const key =
+      req.query.key ||
+      req.query.sub1 ||
+      req.query.subid ||
+      req.query.uid ||
+      req.query.sub_id;
 
     // تحقق من السر لحماية الرابط
     if (secret !== process.env.POSTBACK_SECRET) {
