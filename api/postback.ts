@@ -50,6 +50,7 @@ export default async function handler(req, res) {
     // تحديث verified + payout
     await docRef.update({
       verified: true,
+      status: "accepted",
       payout: payout ? parseFloat(payout) : 0,
       verifiedAt: new Date().toISOString(),
     });
