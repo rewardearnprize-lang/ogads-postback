@@ -25,6 +25,12 @@ export default async function handler(req, res) {
     // دعم جميع أسماء المفاتيح المحتملة من OGAds أو LockedApp
     const key =
       req.query.key ||
+      req.query.aff_sub ||
+      req.query.aff_sub1 ||
+      req.query.aff_sub2 ||
+      req.query.aff_sub3 ||
+      req.query.aff_sub4 ||
+      req.query.aff_sub5 ||
       req.query.sub1 ||
       req.query.subid ||
       req.query.uid ||
